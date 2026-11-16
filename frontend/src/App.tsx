@@ -58,6 +58,14 @@ const GROUP_LABELS: Record<string, string> = {
   suim_wreck_WR: 'Xác tàu',
 };
 
+const DEFAULT_PAIRS: Record<string, [string, string]> = {
+  lung_xray: ['lung_1', 'lung_3'],
+  suim_diver_HD: ['hd_1', 'hd_2'],
+  suim_fish_FV: ['fv_1', 'fv_2'],
+  suim_wreck_WR: ['wr_2', 'wr_3'],
+  suim_robot_RO: ['ro_2', 'ro_3'],
+};
+
 const STAGES: { key: string; title: string; note: string }[] = [
   { key: 'Low', title: 'Tầng nông', note: 'L3–L6, cạnh và kết cấu' },
   { key: 'Mid', title: 'Tầng giữa', note: 'L7–L12, hình dạng và bộ phận' },
@@ -81,6 +89,14 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CompareResponse | null>(null);
 
+  const pickDefaultPair = (g: string, nextItems: DemoSampleItem[]) => {
+    const pair = DEFAULT_PAIRS[g];
+    const sItem = (pair && nextItems.find((x) => x.id === pair[0])) || nextItems[0];
+    const qItem = (pair && nextItems.find((x) => x.id === pair[1])) || nextItems[1];
+    if (sItem) setSupport(fromSample(sItem));
+    if (qItem) setQuery(fromSample(qItem));
+  };
+
   useEffect(() => {
     fetch('/api/demo-samples')
       .then((r) => r.json())
@@ -90,9 +106,7 @@ export default function App() {
         const first = Object.keys(g)[0];
         if (first) {
           setGroup(first);
-          const items = g[first];
-          if (items[0]) setSupport(fromSample(items[0]));
-          if (items[1]) setQuery(fromSample(items[1]));
+          pickDefaultPair(first, g[first]);
         }
       })
       .catch(() => setError('Không kết nối được máy chủ demo. Hãy chạy uvicorn demo_api:app.'));
@@ -109,9 +123,7 @@ export default function App() {
   const selectGroup = (g: string) => {
     setGroup(g);
     setError(null);
-    const nextItems = groups[g] || [];
-    if (nextItems[0]) setSupport(fromSample(nextItems[0]));
-    if (nextItems[1]) setQuery(fromSample(nextItems[1]));
+    pickDefaultPair(g, groups[g] || []);
     setActiveSlot('support');
   };
 
