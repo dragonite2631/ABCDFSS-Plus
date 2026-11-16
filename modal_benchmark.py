@@ -140,6 +140,8 @@ def run_table4_unit(
         fit_every_episode=True,
         abcdfss_dir="/workspace/ABCDFSS",
         require_cuda=True,
+        checkpoint_every=50,
+        on_checkpoint=lambda: results_vol.commit(),
     )
     results_vol.commit()
     return res["results"][0]

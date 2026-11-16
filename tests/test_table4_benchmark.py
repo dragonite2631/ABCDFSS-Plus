@@ -127,6 +127,61 @@ class TestTable4Benchmark(unittest.TestCase):
             html_row = merge_table4_results.format_table4_html_row(merged)
             self.assertIn("ABCDFSS-Plus (every-episode, no-pp)", html_row)
 
+    def test_mid_unit_checkpoint_and_resume(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lung = os.path.join(tmp, "lung")
+            for i in range(3):
+                _save_rgb(os.path.join(lung, "CXR_png", f"p{i}.png"), size=(64, 64))
+                _save_mask(os.path.join(lung, "masks", f"p{i}_mask.png"), size=(64, 64))
+
+            out_dir = os.path.join(tmp, "out")
+            ckpt_path = os.path.join(out_dir, "lung_1shot_ckpt.pt")
+
+            def _interrupt_on_first_ckpt():
+                raise RuntimeError("simulated preemption")
+
+            with self.assertRaisesRegex(RuntimeError, "simulated preemption"):
+                run_benchmark(
+                    dataset_roots={"lung": lung},
+                    output_dir=out_dir,
+                    benchmarks=["lung"],
+                    shots=[1],
+                    max_episodes_override=3,
+                    seed=42,
+                    num_epochs=1,
+                    fit_every_episode=True,
+                    abcdfss_dir=ABCDFSS_DIR,
+                    backbone_factory=_DummyBackbone,
+                    require_cuda=False,
+                    checkpoint_every=1,
+                    on_checkpoint=_interrupt_on_first_ckpt,
+                )
+
+            self.assertTrue(os.path.isfile(ckpt_path))
+
+            ckpt_calls = []
+            res = run_benchmark(
+                dataset_roots={"lung": lung},
+                output_dir=out_dir,
+                benchmarks=["lung"],
+                shots=[1],
+                max_episodes_override=3,
+                seed=42,
+                num_epochs=1,
+                fit_every_episode=True,
+                abcdfss_dir=ABCDFSS_DIR,
+                backbone_factory=_DummyBackbone,
+                require_cuda=False,
+                checkpoint_every=1,
+                on_checkpoint=lambda: ckpt_calls.append(1),
+            )
+
+            self.assertFalse(os.path.exists(ckpt_path))
+            self.assertEqual(len(ckpt_calls), 1)
+            self.assertEqual(res["results"][0]["episode_count"], 3)
+            self.assertEqual(res["results"][0]["inference_mode"], "every-episode")
+            self.assertTrue(os.path.isfile(os.path.join(out_dir, "results.csv")))
+
 
 if __name__ == "__main__":
     unittest.main()

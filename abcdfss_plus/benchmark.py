@@ -2,14 +2,16 @@ import csv
 import json
 import logging
 import os
+import random
 import sys
 import time
 import types
 from contextlib import contextmanager
 from typing import Callable, Dict, List, Optional
 
+import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ABCDFSS_DIR = os.path.join(ROOT_DIR, "ABCDFSS")
@@ -145,6 +147,9 @@ def evaluate_single_unit(
     abcdfss_dir: str = ABCDFSS_DIR,
     logger: Optional[logging.Logger] = None,
     log_every: int = 100,
+    checkpoint_dir: Optional[str] = None,
+    checkpoint_every: int = 50,
+    on_checkpoint: Optional[Callable[[], None]] = None,
 ) -> dict:
     utils.fix_randseed(seed)
     with _working_directory(abcdfss_dir):
@@ -153,15 +158,6 @@ def evaluate_single_unit(
             benchmark, bsz=1, nworker=0, fold=0, split="test", shot=shot
         )
         dataset = base_loader.dataset
-
-    effective_workers = 4 if (os.name != "nt" and device.type == "cuda") else 0
-    dataloader = DataLoader(
-        dataset,
-        batch_size=1,
-        shuffle=False,
-        num_workers=effective_workers,
-        pin_memory=(device.type == "cuda"),
-    )
 
     available_episodes = len(dataset)
     target_episodes = (
@@ -188,10 +184,37 @@ def evaluate_single_unit(
     Evaluator.initialize()
     meter = AverageMeter(dataset, device)
 
+    start_idx = 0
+    prior_elapsed = 0.0
+    ckpt_path = os.path.join(checkpoint_dir, f"{benchmark}_{shot}shot_ckpt.pt") if checkpoint_dir else None
+    if ckpt_path and os.path.isfile(ckpt_path):
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        start_idx = int(ckpt["processed"])
+        prior_elapsed = float(ckpt.get("elapsed_sec", 0.0))
+        meter.intersection_buf = ckpt["intersection_buf"].to(device)
+        meter.union_buf = ckpt["union_buf"].to(device)
+        random.setstate(ckpt["py_rng"])
+        np.random.set_state(ckpt["np_rng"])
+        torch.set_rng_state(ckpt["torch_rng"].cpu())
+        if logger:
+            logger.info(
+                f"[{benchmark} {shot}-shot] Resuming from checkpoint at episode {start_idx}/{target_episodes}"
+            )
+
+    eval_dataset = Subset(dataset, range(start_idx, target_episodes)) if start_idx > 0 else dataset
+    effective_workers = 4 if (os.name != "nt" and device.type == "cuda") else 0
+    dataloader = DataLoader(
+        eval_dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=effective_workers,
+        pin_memory=(device.type == "cuda"),
+    )
+
     t0 = time.time()
-    processed = 0
-    for idx, batch in enumerate(dataloader):
-        if idx >= target_episodes:
+    processed = start_idx
+    for offset, batch in enumerate(dataloader):
+        if start_idx + offset >= target_episodes:
             break
         b = utils.to_cuda(batch) if device.type == "cuda" else batch
         q_img = b["query_img"]
@@ -213,10 +236,30 @@ def evaluate_single_unit(
             logger.info(
                 f"[{benchmark} {shot}-shot] {processed}/{target_episodes} episodes | "
                 f"running mIoU={cur_miou.item():.2f}% FB-IoU={cur_fbiou.item():.2f}% "
-                f"elapsed={time.time() - t0:.1f}s"
+                f"elapsed={prior_elapsed + (time.time() - t0):.1f}s"
             )
 
-    elapsed = time.time() - t0
+        if ckpt_path and checkpoint_every > 0 and processed % checkpoint_every == 0 and processed < target_episodes:
+            tmp_ckpt = ckpt_path + ".tmp"
+            torch.save(
+                {
+                    "processed": processed,
+                    "elapsed_sec": prior_elapsed + (time.time() - t0),
+                    "intersection_buf": meter.intersection_buf.detach().cpu(),
+                    "union_buf": meter.union_buf.detach().cpu(),
+                    "py_rng": random.getstate(),
+                    "np_rng": np.random.get_state(),
+                    "torch_rng": torch.get_rng_state(),
+                },
+                tmp_ckpt,
+            )
+            os.replace(tmp_ckpt, ckpt_path)
+            if on_checkpoint:
+                on_checkpoint()
+
+    elapsed = prior_elapsed + (time.time() - t0)
+    if ckpt_path and os.path.isfile(ckpt_path):
+        os.remove(ckpt_path)
     miou, fb_iou = meter.compute_iou()
     return {
         "benchmark": benchmark,
@@ -246,6 +289,8 @@ def run_benchmark(
     abcdfss_dir: str = ABCDFSS_DIR,
     backbone_factory: Optional[Callable[[], torch.nn.Module]] = None,
     require_cuda: bool = False,
+    checkpoint_every: int = 50,
+    on_checkpoint: Optional[Callable[[], None]] = None,
 ) -> dict:
     logger = _setup_logger(output_dir)
     target_benchmarks = benchmarks or list(DEFAULT_BENCHMARKS)
@@ -326,6 +371,9 @@ def run_benchmark(
                         fit_every_episode=fit_every_episode,
                         abcdfss_dir=abcdfss_dir,
                         logger=logger,
+                        checkpoint_dir=output_dir,
+                        checkpoint_every=checkpoint_every,
+                        on_checkpoint=on_checkpoint,
                     )
                 except Exception as exc:
                     progress["failed_unit"] = {"unit": key, "error": str(exc)}
