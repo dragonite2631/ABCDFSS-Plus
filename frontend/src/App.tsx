@@ -106,12 +106,23 @@ export default function App() {
     cleanPreview: s.thumb_b64,
   });
 
+  const selectGroup = (g: string) => {
+    setGroup(g);
+    setError(null);
+    const nextItems = groups[g] || [];
+    if (nextItems[0]) setSupport(fromSample(nextItems[0]));
+    if (nextItems[1]) setQuery(fromSample(nextItems[1]));
+    setActiveSlot('support');
+  };
+
   const assign = (p: Picked) => {
     setError(null);
     if (activeSlot === 'support') {
+      if (query && p.imgPath === query.imgPath) return;
       setSupport(p);
       setActiveSlot('query');
     } else {
+      if (support && p.imgPath === support.imgPath) return;
       setQuery(p);
     }
   };
@@ -224,21 +235,24 @@ export default function App() {
             <h2>{activeSlot === 'support' ? 'Chọn ảnh mẫu' : 'Chọn ảnh cần tách'}</h2>
             <div className="chips" style={{ marginBottom: '0.85rem' }}>
               {Object.keys(groups).map((g) => (
-                <button key={g} type="button" className="chip" aria-pressed={group === g} onClick={() => setGroup(g)}>
+                <button key={g} type="button" className="chip" aria-pressed={group === g} onClick={() => selectGroup(g)}>
                   {GROUP_LABELS[g] || g}
                 </button>
               ))}
             </div>
             <div className="tray">
               {items.map((it) => {
-                const tag =
-                  support?.imgPath === it.img_abs ? 'Mẫu' : query?.imgPath === it.img_abs ? 'Tách' : undefined;
+                const isSupport = support?.imgPath === it.img_abs;
+                const isQuery = query?.imgPath === it.img_abs;
+                const tag = isSupport ? 'Mẫu' : isQuery ? 'Tách' : undefined;
+                const disabled = (activeSlot === 'support' && isQuery) || (activeSlot === 'query' && isSupport);
                 return (
                   <button
                     key={it.id}
                     type="button"
                     className="thumb"
                     data-tag={tag}
+                    disabled={disabled}
                     aria-label={`${it.id}${tag ? `, đang là ${tag}` : ''}`}
                     onClick={() => assign(fromSample(it))}
                   >

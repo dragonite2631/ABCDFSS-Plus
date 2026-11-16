@@ -265,6 +265,11 @@ button {
   opacity: 1;
 }
 
+.thumb:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .thumb[data-tag]::after {
   content: attr(data-tag);
   position: absolute;
