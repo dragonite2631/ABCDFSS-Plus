@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.vscode/
+.kaggle/
+dist/
+datasets/
+ABCDFSS/.git/
+ABCDFSS/logs/
+frontend/node_modules/
+*.log
