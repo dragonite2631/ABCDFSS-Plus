@@ -47,9 +47,13 @@ def compute_support_self_loss(original_features, transformed_features, augmented
 
 
 def chunked_dense_info_nce_loss(original_features, transformed_features, config_nce, chunk_size=1):
-    """Mathematically identical to ctrutils.dense_info_nce_loss, using gradient checkpointing per chunk to fit 4GB VRAM in 5-shot."""
+    """Mathematically identical to ctrutils.dense_info_nce_loss, using gradient checkpointing per chunk only on <12GB GPUs."""
     B = transformed_features.shape[0]
-    if B <= 2:
+    has_large_vram = (
+        original_features.is_cuda
+        and torch.cuda.get_device_properties(original_features.device).total_memory >= 12 * (1024 ** 3)
+    )
+    if B <= 2 or has_large_vram:
         return ctrutils.dense_info_nce_loss(original_features, transformed_features, config_nce)
     from torch.utils.checkpoint import checkpoint
 

@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from typing import Callable, Dict, List, Optional
 
 import torch
+from torch.utils.data import DataLoader
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ABCDFSS_DIR = os.path.join(ROOT_DIR, "ABCDFSS")
@@ -148,10 +149,19 @@ def evaluate_single_unit(
     utils.fix_randseed(seed)
     with _working_directory(abcdfss_dir):
         FSSDataset.initialize(img_size=400, datapath=dataset_root)
-        dataloader = FSSDataset.build_dataloader(
+        base_loader = FSSDataset.build_dataloader(
             benchmark, bsz=1, nworker=0, fold=0, split="test", shot=shot
         )
-        dataset = dataloader.dataset
+        dataset = base_loader.dataset
+
+    effective_workers = 4 if (os.name != "nt" and device.type == "cuda") else 0
+    dataloader = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=effective_workers,
+        pin_memory=(device.type == "cuda"),
+    )
 
     available_episodes = len(dataset)
     target_episodes = (

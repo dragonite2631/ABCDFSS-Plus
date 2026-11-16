@@ -208,13 +208,26 @@ def main(
     seed: int = 42,
     num_epochs: int = 25,
     skip_download: bool = False,
+    only_unit: str = "",
 ):
-    unit_pairs = PART_UNITS[part] if part in PART_UNITS else [(b, s) for b in BENCHMARKS for s in SHOTS]
+    if only_unit:
+        b, s_str = only_unit.split(":")
+        unit_pairs = [(b.strip(), int(s_str.strip()))]
+    elif part in PART_UNITS:
+        unit_pairs = PART_UNITS[part]
+    else:
+        unit_pairs = [(b, s) for b in BENCHMARKS for s in SHOTS]
     required_keys = sorted({b for b, _ in unit_pairs})
 
     if not skip_download:
         kaggle_env = _load_kaggle_auth()
         ensure_datasets.remote(kaggle_env, required_keys)
+
+    if only_unit:
+        b, s = unit_pairs[0]
+        row = run_table4_unit.remote(b, s, suim_max_episodes, seed, num_epochs)
+        print(f"Completed {b}_{s}shot: {row}", flush=True)
+        return
 
     payload = run_part_detached.remote(
         part=part,
