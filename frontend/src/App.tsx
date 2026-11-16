@@ -13,6 +13,7 @@ interface Picked {
   imgPath: string;
   maskPath: string | null;
   preview: string;
+  cleanPreview: string;
 }
 
 interface LayerInfo {
@@ -102,6 +103,7 @@ export default function App() {
     imgPath: s.img_abs,
     maskPath: s.mask_abs,
     preview: s.overlay_b64,
+    cleanPreview: s.thumb_b64,
   });
 
   const assign = (p: Picked) => {
@@ -132,7 +134,7 @@ export default function App() {
       }
       maskPath = d2.path;
     }
-    assign({ name: d.name.replace(/\.[^.]+$/, ''), imgPath: d.path, maskPath, preview });
+    assign({ name: d.name.replace(/\.[^.]+$/, ''), imgPath: d.path, maskPath, preview, cleanPreview: preview });
   };
 
   const run = async () => {
@@ -198,6 +200,7 @@ export default function App() {
             <div className="slots">
               {(['support', 'query'] as Slot[]).map((s) => {
                 const p = s === 'support' ? support : query;
+                const slotImg = p ? (s === 'support' ? p.preview : p.cleanPreview) : null;
                 return (
                   <button
                     key={s}
@@ -206,7 +209,7 @@ export default function App() {
                     aria-pressed={activeSlot === s}
                     onClick={() => setActiveSlot(s)}
                   >
-                    {p ? <img src={p.preview} alt="" /> : <span className="slot-empty">Trống</span>}
+                    {slotImg ? <img src={slotImg} alt="" /> : <span className="slot-empty">Trống</span>}
                     <span className="slot-name">
                       {s === 'support' ? 'Ảnh mẫu' : 'Ảnh cần tách'}
                       <small>{p ? p.name : 'Chọn bên dưới'}</small>
@@ -239,7 +242,7 @@ export default function App() {
                     aria-label={`${it.id}${tag ? `, đang là ${tag}` : ''}`}
                     onClick={() => assign(fromSample(it))}
                   >
-                    <img src={it.overlay_b64} alt="" />
+                    <img src={activeSlot === 'support' ? it.overlay_b64 : it.thumb_b64} alt="" />
                   </button>
                 );
               })}
