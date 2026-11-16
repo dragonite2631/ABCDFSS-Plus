@@ -1,4 +1,4 @@
-import base64
+﻿import base64
 import glob
 import io
 import json
@@ -106,12 +106,17 @@ def _arr_to_heatmap_b64(arr_2d: np.ndarray, cmap_name: str = "inferno", size=(20
     return _pil_to_b64(img)
 
 
-def _overlay_b64(base_rgb: Image.Image, mask_2d: np.ndarray, color=(34, 197, 94), alpha=0.48) -> str:
+def _overlay_b64(base_rgb: Image.Image, mask_2d: np.ndarray, color=(245, 158, 11), alpha=0.55) -> str:
+    import cv2
+
     base = np.array(base_rgb.resize((400, 400))).astype(np.float32)
-    m = (mask_2d > 0.5).astype(np.float32)[:, :, None]
+    m_bin = (mask_2d > 0.5).astype(np.uint8)
+    m = m_bin.astype(np.float32)[:, :, None]
     c = np.array(color, dtype=np.float32)[None, None, :]
-    blended = base * (1.0 - alpha * m) + c * (alpha * m)
-    return _pil_to_b64(Image.fromarray(blended.clip(0, 255).astype(np.uint8)))
+    blended = (base * (1.0 - alpha * m) + c * (alpha * m)).clip(0, 255).astype(np.uint8)
+    contours, _ = cv2.findContours(m_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(blended, contours, -1, color, 2)
+    return _pil_to_b64(Image.fromarray(blended))
 
 
 def _mask_b64(mask_2d: np.ndarray) -> str:
@@ -243,7 +248,7 @@ def _run_single_variant(
             "feature_norm_b64": _arr_to_heatmap_b64(feat_energy, "magma", size=(160, 160)),
         })
 
-    color = (15, 139, 141) if is_plus else (181, 23, 158)
+    color = (239, 68, 68) if is_plus else (217, 70, 239)
     return {
         "name": "ABCDFSS-Plus" if is_plus else "Baseline ABCDFSS",
         "elapsed_sec": elapsed,
@@ -266,7 +271,7 @@ def health():
 
 
 @app.post("/api/pick-file")
-def pick_file(title: str = "Chá»n áº£nh tá»« demo_samples"):
+def pick_file(title: str = "ChÃ¡Â»Ân Ã¡ÂºÂ£nh tÃ¡Â»Â« demo_samples"):
     initial_dir = os.path.join(ROOT_DIR, "demo_samples")
     if not os.path.isdir(initial_dir):
         initial_dir = ROOT_DIR
@@ -299,7 +304,7 @@ def pick_file(title: str = "Chá»n áº£nh tá»« demo_samples"):
     img_pil = Image.open(selected).convert("RGB")
     if mask_path:
         mask_np = _load_mask_tensor(Image.open(mask_path), size=(400, 400)).numpy()
-        preview = _overlay_b64(img_pil, mask_np, color=(47, 91, 234))
+        preview = _overlay_b64(img_pil, mask_np, color=(245, 158, 11))
     else:
         preview = _pil_to_b64(img_pil.resize((220, 220)))
     return {
@@ -352,7 +357,7 @@ def list_demo_samples():
                 "img_abs": ip,
                 "mask_abs": mp,
                 "thumb_b64": _pil_to_b64(img_pil.resize((220, 220))),
-                "overlay_b64": _overlay_b64(img_pil, mask_np, color=(47, 91, 234)),
+                "overlay_b64": _overlay_b64(img_pil, mask_np, color=(245, 158, 11)),
             })
         if items:
             groups[folder] = items
@@ -488,7 +493,7 @@ async def compare_episode(
     support_previews = [
         {
             "image_b64": _pil_to_b64(sp.resize((400, 400))),
-            "overlay_b64": _overlay_b64(sp, sm.numpy(), color=(47, 91, 234)),
+            "overlay_b64": _overlay_b64(sp, sm.numpy(), color=(245, 158, 11)),
         }
         for sp, sm in zip(s_pils, s_mask_tensors)
     ]
@@ -497,7 +502,7 @@ async def compare_episode(
         "support": support_previews,
         "query": {
             "image_b64": _pil_to_b64(q_pil.resize((400, 400))),
-            "gt_overlay_b64": _overlay_b64(q_pil, q_gt_np, color=(47, 91, 234)) if q_gt_np is not None else None,
+            "gt_overlay_b64": _overlay_b64(q_pil, q_gt_np, color=(245, 158, 11)) if q_gt_np is not None else None,
             "gt_mask_b64": _mask_b64(q_gt_np) if q_gt_np is not None else None,
         },
         "baseline": baseline_res,
