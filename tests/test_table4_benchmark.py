@@ -182,6 +182,28 @@ class TestTable4Benchmark(unittest.TestCase):
             self.assertEqual(res["results"][0]["inference_mode"], "every-episode")
             self.assertTrue(os.path.isfile(os.path.join(out_dir, "results.csv")))
 
+    def test_dwla_multishot_mask_alignment(self):
+        # Construct k=2 supports where shot 0 is all FG ([1, 0]) and shot 1 is all BG ([-1, 0]).
+        # With h=2, w=2:
+        # - In (k, h, w) order: first 4 pixels are FG, last 4 pixels are BG.
+        # - In horizontal smask_row [1, h, k*w] = [1, 2, 4]: row 0 has 2 FG then 2 BG,
+        #   so naive .reshape(1, k*h*w) would misalign pixels (0,1,0,0) with FG features!
+        sft = torch.zeros(1, 2, 2, 2, 2)
+        sft[0, 0, 0, :, :] = 1.0   # shot 0: vector [1, 0] everywhere (FG)
+        sft[0, 1, 0, :, :] = -1.0  # shot 1: vector [-1, 0] everywhere (BG)
+
+        m0 = torch.ones(1, 2, 2)
+        m1 = torch.zeros(1, 2, 2)
+        smask_row = torch.cat([m0, m1], dim=-1)       # [1, 2, 4]
+        smask_stacked = torch.stack([m0, m1], dim=1)  # [1, 2, 2, 2]
+
+        delta_from_row = improved_abcdfss.compute_layer_discriminability(sft, smask_row)
+        delta_from_stacked = improved_abcdfss.compute_layer_discriminability(sft, smask_stacked)
+
+        # True fg_mean = [1, 0], bg_mean = [-1, 0] => sim_fg_fg=1.0, sim_fg_bg=-1.0 => delta=2.0
+        self.assertAlmostEqual(delta_from_row, 2.0, places=5)
+        self.assertAlmostEqual(delta_from_stacked, 2.0, places=5)
+
 
 if __name__ == "__main__":
     unittest.main()

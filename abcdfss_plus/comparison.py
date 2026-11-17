@@ -15,12 +15,15 @@ def compute_layer_discriminability(s_feat_layer, s_mask_downsampled):
     """
     Computes intra-support discriminability delta_l = sim(FG<->FG) - sim(FG<->BG)
     using cosine similarity (Eq. 20, 21, 26 in Appendix C).
-    s_feat_layer: [bsz, k, c, h, w] -> flattened across k*h*w
-    s_mask_downsampled: [bsz, k*h*w]
+    s_feat_layer: [bsz, k, c, h, w] -> flattened across (k, h, w)
+    s_mask_downsampled: [bsz, k, h, w] or horizontally concatenated [bsz, h, k*w]
     """
     bsz, k, c, h, w = s_feat_layer.shape
     feat_flat = F.normalize(s_feat_layer.permute(0, 1, 3, 4, 2).reshape(bsz, k * h * w, c), p=2, dim=-1)
-    mask_flat = s_mask_downsampled.reshape(bsz, k * h * w)
+    if k > 1 and s_mask_downsampled.dim() == 3 and s_mask_downsampled.shape == (bsz, h, k * w):
+        mask_flat = s_mask_downsampled.view(bsz, h, k, w).permute(0, 2, 1, 3).reshape(bsz, k * h * w)
+    else:
+        mask_flat = s_mask_downsampled.reshape(bsz, k * h * w)
 
     fg_idx = mask_flat[0] > 0.5
     bg_idx = ~fg_idx
@@ -68,7 +71,8 @@ class ImprovedDAMatComparison:
             smask_row = torch.cat(smasks_downsampled, -1)
 
             if self.use_dwla:
-                delta = compute_layer_discriminability(sft, smask_row)
+                smask_stacked = torch.stack(smasks_downsampled, dim=1)  # [bsz, k, h, w]
+                delta = compute_layer_discriminability(sft, smask_stacked)
                 deltas.append(delta)
 
             if self.use_cosine_affinity:
