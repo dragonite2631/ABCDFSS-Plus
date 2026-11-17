@@ -1,0 +1,28 @@
+{
+  "method": "ABCDFSS (original)",
+  "table": "Table 4 (every-episode, no-pp)",
+  "benchmark": "lung",
+  "platform": "Modal (T4)",
+  "results": [
+    {
+      "method": "ABCDFSS (original)",
+      "benchmark": "lung",
+      "shot": 1,
+      "adapt_to": "every-episode",
+      "postprocessing": "off",
+      "mIoU": 79.7,
+      "FB-IoU": 86.16,
+      "elapsed_sec": 3525.27
+    },
+    {
+      "method": "ABCDFSS (original)",
+      "benchmark": "lung",
+      "shot": 5,
+      "adapt_to": "every-episode",
+      "postprocessing": "off",
+      "mIoU": 81.57,
+      "FB-IoU": 87.46,
+      "elapsed_sec": 6139.93
+    }
+  ]
+}

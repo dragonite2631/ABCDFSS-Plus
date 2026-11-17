@@ -1,0 +1,4 @@
+benchmark,shot,mIoU,FB-IoU,episode_count,available_episodes,elapsed_sec,seed,inference_mode,num_epochs
+deepglobe,1,37.47,44.85,1833,1833,8989.85,42,every-episode,25
+isic,5,48.54,64.18,2594,2594,3284.6,42,every-episode,25
+lung,5,82.92,88.4,704,704,3204.2,42,every-episode,25
