@@ -1,0 +1,48 @@
+{
+  "method": "ABCDFSS-Plus",
+  "table": "Table 4 (no-pp)",
+  "part": 2,
+  "platform": "Modal (T4)",
+  "inference_mode": "every-episode",
+  "results": [
+    {
+      "benchmark": "deepglobe",
+      "shot": 1,
+      "mIoU": 37.47,
+      "FB-IoU": 44.85,
+      "episode_count": 1833,
+      "available_episodes": 1833,
+      "elapsed_sec": 8989.85,
+      "seed": 42,
+      "inference_mode": "every-episode",
+      "num_epochs": 25,
+      "resolved_root": "/data/deepglobe"
+    },
+    {
+      "benchmark": "lung",
+      "shot": 5,
+      "mIoU": 84.31,
+      "FB-IoU": 89.46,
+      "episode_count": 704,
+      "available_episodes": 704,
+      "elapsed_sec": 5634.92,
+      "seed": 42,
+      "inference_mode": "every-episode",
+      "num_epochs": 25,
+      "resolved_root": "/data/lung"
+    },
+    {
+      "benchmark": "isic",
+      "shot": 5,
+      "mIoU": 49.77,
+      "FB-IoU": 65.27,
+      "episode_count": 2594,
+      "available_episodes": 2594,
+      "elapsed_sec": 20720.97,
+      "seed": 42,
+      "inference_mode": "every-episode",
+      "num_epochs": 25,
+      "resolved_root": "/data/isic"
+    }
+  ]
+}

@@ -57,8 +57,11 @@ ABCDFSS loại bỏ hoàn toàn quá trình huấn luyện trên tập nguồn v
 ### 2.2. Kết quả tái tạo thực nghiệm của chúng tôi
 Chúng tôi tái tạo thực nghiệm bằng mã nguồn chính thức trên GPU **NVIDIA GTX 1650 (4GB)** với hai bộ dữ liệu thực tế: **Chest X-ray Lung** (Montgomery Set, 138 ảnh) và **SUIM** (1.598 ảnh, 7 lớp).
 
-1. **Tái tạo toàn bộ tập Lung (138 episodes, 1-shot, `quick-infer`, `no-pp`):**
-   - Kết quả chạy từ `ABCDFSS/main.py`: **82.54% mIoU | 87.92% FB-IoU** (tương đồng chặt chẽ với báo cáo `80.0% / 86.2%` trong Bảng 4 của bài báo trên tập gộp Montgomery+Shenzhen).
+1. **Tái tạo toàn bộ tập Lung (704 episodes Montgomery+Shenzhen, `every-episode`, `no-pp` — chuẩn Bảng 4 trên Modal T4, và 138 episodes Montgomery, `quick-infer`, `no-pp` trên GTX 1650):**
+   - Trên tập chuẩn **704 ảnh** (`every-episode`, `no-pp` từ `ABCDFSS/main.py`):
+     - **Lung 1-shot:** **79.70% mIoU | 86.16% FB-IoU** (khớp sát với con số bài báo công bố trong Bảng 4: `80.0% / 86.2%`).
+     - **Lung 5-shot:** **81.57% mIoU | 87.46% FB-IoU** (khớp sát với con số bài báo công bố trong Bảng 4: `81.4% / 87.3%`).
+   - Trên tập Montgomery 138 episodes (`quick-infer`, `no-pp` trên GTX 1650): **82.54% mIoU | 87.92% FB-IoU**.
 2. **Tái tạo Ablation Study (Bảng 6) trên cùng tập episode cố định (`seed=42`, 50 episodes Lung, 70 episodes SUIM):**
 
 | Cấu hình Ablation | Lung 1-shot (mIoU / FB-IoU) | Lung 5-shot (mIoU / FB-IoU) | SUIM 1-shot (mIoU / FB-IoU) | SUIM 5-shot (mIoU / FB-IoU) |
@@ -108,11 +111,11 @@ Từ các điểm nghẽn đã phân tích, chúng tôi đề xuất 3 cải ti�
 
 | Phương pháp | Lung 1-shot | Lung 5-shot | SUIM 1-shot | SUIM 5-shot |
 | :--- | :---: | :---: | :---: | :---: |
-| **Baseline (ABCDFSS gốc)** | 81.88 / 87.32 | 82.98 / 88.02 | 29.21 / 48.37 | 40.47 / 57.15 |
-| `+ Imp1: DWLA` | 81.25 / 86.91 | 83.08 / 88.09 | 28.78 / 49.34 | **40.58** / 57.33 |
+| **Baseline (ABCDFSS gốc)** | 81.88 / 87.32 | 82.98 / 88.02 | 29.21 / 48.37 | **40.47** / 57.15 |
+| `+ Imp1: DWLA` | 81.25 / 86.91 | 83.31 / 88.30 | 28.78 / 49.34 | 39.36 / 56.54 |
 | `+ Imp2: DWConv3x3` | 84.54 / 89.44 | 84.49 / 89.36 | 28.87 / 49.42 | 40.27 / **58.53** |
 | `+ Imp3: SelfRec+CosAff` | **85.71 / 90.23** | **86.28 / 90.61** | 28.81 / 48.50 | 38.80 / 56.72 |
-| **Full Improved (Imp1+2+3)** | 84.31 / 89.25 | 86.25 / 90.60 | **29.50 / 50.77** | 38.57 / 57.07 |
+| **Full Improved (Imp1+2+3)** | 84.31 / 89.25 | 85.86 / 90.31 | **29.50 / 50.77** | 39.17 / 58.15 |
 
 Biểu đồ so sánh chi tiết và ảnh phân đoạn trực quan được lưu tại [comparison_charts.png](file:///D:/Code/BTL_CV/results/comparison_charts.png) và [qualitative_comparison.png](file:///D:/Code/BTL_CV/results/qualitative_comparison.png).
 
@@ -135,7 +138,7 @@ Biểu đồ so sánh chi tiết và ảnh phân đoạn trực quan được l�
    - Độ phân biệt không gian nhúng `inter_delta` ở tầng trung (M) tăng vọt từ `42.55` lên `51.82`.
 2. **Hiệu quả trên miền phức tạp đa lớp (SUIM):**
    - Ở 1-shot (kịch bản khan hiếm nhãn nhất), `Full Improved` đạt kết quả tốt nhất cả về mIoU (**29.50%**) lẫn FB-IoU (**50.77%**, tăng **+2.40%** so với Baseline), giảm đáng kể hiện tượng dự đoán sai nền (over-prediction).
-   - Ở 5-shot SUIM, khi đã có 5 ảnh support đa dạng, `Imp1 (DWLA)` (+0.11% mIoU) và `Imp2 (DWConv3x3)` (+1.38% FB-IoU) vẫn giữ hiệu quả tích cực, nhưng `Imp3` với nhiệt độ sắc nét $\tau_{aff}=0.15$ làm mô hình hơi quá tự tin vào các điểm ảnh support gần nhất trong trường hợp nội lớp có phương sai lớn (như các loài cá/rạn san hô khác nhau trong SUIM). Đây là một phát hiện thực nghiệm quan trọng: $\tau_{aff}$ nên được điều chỉnh thích nghi theo số lượng shot $k$ hoặc phương sai nội lớp.
+   - Ở 5-shot SUIM, khi đã có 5 ảnh support đa dạng, `Imp2 (DWConv3x3)` (+1.38% FB-IoU) và `Full Improved` (+1.00% FB-IoU, đạt `58.15%` so với `57.15%` của Baseline) giúp cải thiện độ cân bằng tiền cảnh–hậu cảnh, nhưng nhiệt độ sắc nét $\tau_{aff}=0.15$ của `Imp3` làm mô hình hơi quá tự tin vào các điểm ảnh support gần nhất trong trường hợp nội lớp có phương sai lớn (như các loài cá/rạn san hô khác nhau trong SUIM). Đây là một phát hiện thực nghiệm quan trọng: $\tau_{aff}$ nên được điều chỉnh thích nghi theo số lượng shot $k$ hoặc phương sai nội lớp.
 3. **Chi phí tính toán:**
    - Tổng thời gian thích nghi + suy luận tăng rất ít (từ `10.48s` lên `15.92s–17.11s` cho 50 episodes Lung 1-shot, tức chỉ tăng ~0.1s mỗi lần fit), hoàn toàn chấp nhận được và vẫn giữ nguyên tốc độ suy luận nhanh ở chế độ `quick-infer`.
 
